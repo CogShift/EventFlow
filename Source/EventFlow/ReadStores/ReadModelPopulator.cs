@@ -29,7 +29,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Configuration;
-using EventFlow.Core;
 using EventFlow.EventStores;
 using EventFlow.Extensions;
 using EventFlow.Logs;
@@ -55,35 +54,49 @@ namespace EventFlow.ReadStores
             _resolver = resolver;
         }
 
-        public Task PurgeAsync<TReadModel>(CancellationToken cancellationToken)
-            where TReadModel : class, IReadModel, new()
-        {
-            var readModelStores = _resolver.Resolve<IEnumerable<IReadModelStore<TReadModel>>>().ToList();
-            if (!readModelStores.Any())
-            {
-                throw new ArgumentException($"Could not find any read stores for read model '{typeof(TReadModel).PrettyPrint()}'");
-            }
-
-            var deleteTasks = readModelStores.Select(s => s.DeleteAllAsync(cancellationToken));
-            return Task.WhenAll(deleteTasks);
-        }
-
-        public void Purge<TReadModel>(CancellationToken cancellationToken)
-            where TReadModel : class, IReadModel, new()
-        {
-            using (var a = AsyncHelper.Wait)
-            {
-                a.Run(PurgeAsync<TReadModel>(cancellationToken));
-            }
-        }
-
-        public async Task PopulateAsync<TReadModel>(
+        public Task PurgeAsync<TReadModel>(
             CancellationToken cancellationToken)
             where TReadModel : class, IReadModel, new()
         {
+            return PurgeAsync(typeof(TReadModel), cancellationToken);
+        }
+
+        public async Task PurgeAsync(
+            Type readModelType,
+            CancellationToken cancellationToken)
+        {
+            var readModelStores = ResolveReadModelStores(readModelType);
+
+            var deleteTasks = readModelStores.Select(s => s.DeleteAllAsync(cancellationToken));
+            await Task.WhenAll(deleteTasks).ConfigureAwait(false);
+        }
+
+        public async Task DeleteAsync(
+            string id,
+            Type readModelType,
+            CancellationToken cancellationToken)
+        {
+            var readModelStores = ResolveReadModelStores(readModelType);
+
+            _log.Verbose(() => $"Deleting read model {readModelType.PrettyPrint()} with ID '{id}'");
+
+            var deleteTasks = readModelStores.Select(s => s.DeleteAsync(id, cancellationToken));
+            await Task.WhenAll(deleteTasks).ConfigureAwait(false);
+        }
+
+        public Task PopulateAsync<TReadModel>(
+            CancellationToken cancellationToken)
+            where TReadModel : class, IReadModel, new()
+        {
+            return PopulateAsync(typeof(TReadModel), cancellationToken);
+        }
+
+        public async Task PopulateAsync(
+            Type readModelType,
+            CancellationToken cancellationToken)
+        {
             var stopwatch = Stopwatch.StartNew();
-            var readModelType = typeof(TReadModel);
-            var readStoreManagers = ResolveReadStoreManager<TReadModel>();
+            var readStoreManagers = ResolveReadStoreManagers(readModelType);
 
             var aggregateEventTypes = new HashSet<Type>(readModelType
                 .GetTypeInfo()
@@ -145,26 +158,32 @@ namespace EventFlow.ReadStores
                 relevantEvents);
         }
 
-        public void Populate<TReadModel>(CancellationToken cancellationToken)
-            where TReadModel : class, IReadModel, new()
+        private IReadOnlyCollection<IReadModelStore> ResolveReadModelStores(
+            Type readModelType)
         {
-            using (var a = AsyncHelper.Wait)
+            var readModelStoreType = typeof(IReadModelStore<>).MakeGenericType(readModelType);
+            var readModelStores = _resolver.ResolveAll(readModelStoreType)
+                .Select(s => (IReadModelStore)s)
+                .ToList();
+
+            if (!readModelStores.Any())
             {
-                a.Run(PopulateAsync<TReadModel>(cancellationToken));
+                throw new ArgumentException($"Could not find any read stores for read model '{readModelType.PrettyPrint()}'");
             }
+
+            return readModelStores;
         }
 
-        private IReadOnlyCollection<IReadStoreManager<TReadModel>> ResolveReadStoreManager<TReadModel>()
-            where TReadModel : class, IReadModel, new()
+        private IReadOnlyCollection<IReadStoreManager> ResolveReadStoreManagers(
+            Type readModelType)
         {
             var readStoreManagers = _resolver.Resolve<IEnumerable<IReadStoreManager>>()
-                .Select(m => m as IReadStoreManager<TReadModel>)
-                .Where(m => m != null)
+                .Where(m => m.ReadModelType == readModelType)
                 .ToList();
 
             if (!readStoreManagers.Any())
             {
-                throw new ArgumentException($"Did not find any read store managers for read model type '{typeof(TReadModel).PrettyPrint()}'");
+                throw new ArgumentException($"Did not find any read store managers for read model type '{readModelType.PrettyPrint()}'");
             }
 
             return readStoreManagers;

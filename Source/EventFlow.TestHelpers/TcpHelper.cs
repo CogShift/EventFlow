@@ -35,13 +35,18 @@ namespace EventFlow.TestHelpers
         public static int GetFreePort()
         {
             var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-            var activeTcpListeners = ipGlobalProperties.GetActiveTcpListeners();
-            var ports = new HashSet<int>(activeTcpListeners.Select(p => p.Port));
+            var usedPorts = Enumerable.Empty<int>()
+                .Concat(ipGlobalProperties.GetActiveTcpListeners().Select(l => l.Port))
+                .Concat(ipGlobalProperties.GetActiveUdpListeners().Select(l => l.Port))
+                .Concat(ipGlobalProperties.GetActiveTcpConnections().Select(c => c.LocalEndPoint.Port))
+                .Distinct();
+
+            var portLookup = new HashSet<int>(usedPorts);
 
             while (true)
             {
                 var port = Random.Next(10000, 60000);
-                if (!ports.Contains(port))
+                if (!portLookup.Contains(port))
                 {
                     return port;
                 }
