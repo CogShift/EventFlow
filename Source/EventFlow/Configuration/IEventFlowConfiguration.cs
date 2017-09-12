@@ -22,6 +22,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 using System;
+using Newtonsoft.Json;
 
 namespace EventFlow.Configuration
 {
@@ -69,5 +70,10 @@ namespace EventFlow.Configuration
         /// </summary>
         /// <remarks>Defaults to false</remarks>
         bool IsAsynchronousSubscribersEnabled { get; }
+
+        /// <summary>
+        /// Configuration settings for the EventFlow Json Serializer
+        /// </summary>
+        JsonSerializerSettings SerializerSettings { get; set; }
     }
 }

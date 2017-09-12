@@ -22,6 +22,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 using System;
+using Newtonsoft.Json;
 
 namespace EventFlow.Configuration
 {
@@ -32,6 +33,7 @@ namespace EventFlow.Configuration
         public TimeSpan DelayBeforeRetryOnOptimisticConcurrencyExceptions { get; set; }
         public bool ThrowSubscriberExceptions { get; set; }
         public bool IsAsynchronousSubscribersEnabled { get; set; }
+        public JsonSerializerSettings SerializerSettings { get; set; }
 
         internal EventFlowConfiguration()
         {
@@ -40,6 +42,7 @@ namespace EventFlow.Configuration
             DelayBeforeRetryOnOptimisticConcurrencyExceptions = TimeSpan.FromMilliseconds(100);
             ThrowSubscriberExceptions = false;
             IsAsynchronousSubscribersEnabled = false;
+            SerializerSettings = new JsonSerializerSettings();
         }
     }
 }

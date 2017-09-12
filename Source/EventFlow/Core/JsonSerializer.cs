@@ -22,35 +22,35 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 using System;
+using EventFlow.Configuration;
 using Newtonsoft.Json;
 
 namespace EventFlow.Core
 {
     public class JsonSerializer : IJsonSerializer
     {
-        private static readonly JsonSerializerSettings SettingsNotIndented = new JsonSerializerSettings
-            {
-                Formatting = Formatting.None,
-            };
-        private static readonly JsonSerializerSettings SettingsIndented = new JsonSerializerSettings
-            {
-                Formatting = Formatting.Indented,
-            };
+        public JsonSerializer(IEventFlowConfiguration configuration)
+        {
+            _settings = configuration.SerializerSettings ?? new JsonSerializerSettings();
+        }
+
+        private readonly JsonSerializerSettings _settings;
 
         public string Serialize(object obj, bool indented = false)
         {
-            var settings = indented ? SettingsIndented : SettingsNotIndented;
-            return JsonConvert.SerializeObject(obj, settings);
+            _settings.Formatting = indented ? Formatting.Indented : Formatting.None;
+
+            return JsonConvert.SerializeObject(obj, _settings);
         }
 
         public object Deserialize(string json, Type type)
         {
-            return JsonConvert.DeserializeObject(json, type);
+            return JsonConvert.DeserializeObject(json, type, _settings);
         }
 
         public T Deserialize<T>(string json)
         {
-            return JsonConvert.DeserializeObject<T>(json);
+            return JsonConvert.DeserializeObject<T>(json, _settings);
         }
     }
 }
